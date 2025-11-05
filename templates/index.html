@@ -1,0 +1,912 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Event Analyzer</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #006bbd 0%, #11006e 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            opacity: 0.9;
+        }
+
+        .chat-container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            height: 70vh;
+        }
+
+        .data-info {
+            background: linear-gradient(to right, #5aa6bb 0%, #0c2472 100%);
+            color: white;
+            padding: 15px 20px;
+            font-size: 0.9rem;
+        }
+
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            background: #f8f9fa;
+        }
+
+        .message {
+            margin-bottom: 20px;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .message.user {
+            text-align: right;
+        }
+
+        .message-content {
+            display: inline-block;
+            max-width: 80%;
+            padding: 15px 20px;
+            border-radius: 20px;
+            word-wrap: break-word;
+        }
+
+        .message.user .message-content {
+            background: linear-gradient(135deg, #0055a0 0%, #080073 100%);
+            color: white;
+            border-bottom-right-radius: 5px;
+        }
+
+        .message.bot .message-content {
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-bottom-left-radius: 5px;
+            text-align: left;
+        }
+
+        .message.bot .message-content h1,
+        .message.bot .message-content h2,
+        .message.bot .message-content h3 {
+            margin-top: 15px;
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        .message.bot .message-content h1 {
+            font-size: 1.5rem;
+            border-bottom: 2px solid #0055a0;
+            padding-bottom: 5px;
+        }
+
+        .message.bot .message-content h2 {
+            font-size: 1.3rem;
+        }
+
+        .message.bot .message-content h3 {
+            font-size: 1.1rem;
+        }
+
+        .message.bot .message-content p {
+            margin-bottom: 10px;
+            line-height: 1.6;
+            color: #333;
+        }
+
+        .message.bot .message-content strong {
+            color: #0055a0;
+            font-weight: 600;
+        }
+
+        .message.bot .message-content ul,
+        .message.bot .message-content ol {
+            margin: 10px 0;
+            padding-left: 25px;
+        }
+
+        .message.bot .message-content li {
+            margin-bottom: 8px;
+            line-height: 1.5;
+        }
+
+        .message.bot .message-content table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+
+        .message.bot .message-content th,
+        .message.bot .message-content td {
+            border: 1px solid #ddd;
+            padding: 10px;
+            text-align: left;
+        }
+
+        .message.bot .message-content th {
+            background: #0055a0;
+            color: white;
+        }
+
+        .message.bot .message-content tr:nth-child(even) {
+            background: #f9f9f9;
+        }
+
+        .message.bot .message-content code {
+            background: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            color: #d63384;
+        }
+
+        .input-area {
+            padding: 20px;
+            background: white;
+            border-top: 1px solid #e0e0e0;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 10px;
+        }
+
+        input {
+            flex: 1;
+            padding: 15px 20px;
+            border: 2px solid #e0e0e0;
+            border-radius: 25px;
+            font-size: 1rem;
+            outline: none;
+            transition: border 0.3s;
+        }
+
+        input:focus {
+            border-color: #0055a0;
+        }
+
+        button {
+            padding: 15px 30px;
+            background: linear-gradient(135deg, #0055a0 0%, #07006aa5 100%);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .examples {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+            flex-wrap: wrap;
+        }
+
+        .example-chip {
+            padding: 8px 15px;
+            background: #f0f0f0;
+            border-radius: 15px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .example-chip:hover {
+            background: #0055a0;
+            color: white;
+        }
+
+        .error {
+            background: #ff4444 !important;
+            color: white !important;
+        }
+
+        .method-badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 10px;
+            font-size: 0.7rem;
+            margin-left: 5px;
+            font-weight: 600;
+        }
+
+        .method-llm {
+            background: #0055a0;
+            color: white;
+        }
+
+        .method-identifier {
+            background: #10b981;
+            color: white;
+        }
+
+        .method-general {
+            background: #f59e0b;
+            color: white;
+        }
+
+        .confidence-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            margin-left: 8px;
+        }
+
+        .confidence-high {
+            background: #10b981;
+            color: white;
+        }
+
+        .confidence-medium {
+            background: #f59e0b;
+            color: white;
+        }
+
+        .confidence-low {
+            background: #ef4444;
+            color: white;
+        }
+
+        .chart-container {
+            margin: 20px 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #f8fafc 0%, #e0e7ff 100%);
+            border-radius: 16px;
+            border: 2px solid #c7d2fe;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
+        }
+
+        .chart-title {
+            font-weight: 700;
+            font-size: 1.1rem;
+            margin-bottom: 15px;
+            color: #1e293b;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .chart-canvas-wrapper {
+            background: white;
+            padding: 15px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        }
+
+        canvas {
+            max-height: 400px !important;
+            width: 100% !important;
+        }
+
+        .chart-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 12px;
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 2px solid #e2e8f0;
+        }
+
+        .stat-item {
+            background: white;
+            padding: 12px;
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+        }
+
+        .stat-label {
+            font-size: 0.75rem;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
+        }
+
+        .stat-value {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: #0055a0;
+        }
+
+        .cache-indicator {
+            display: inline-block;
+            padding: 3px 8px;
+            background: #8b5cf6;
+            color: white;
+            border-radius: 10px;
+            font-size: 0.7rem;
+            margin-left: 5px;
+        }
+
+        /* NEW: Multi-chart grid */
+        .multi-chart-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+
+        /* Legend for comparison */
+        .chart-legend {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 10px;
+            flex-wrap: wrap;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 4px;
+            border: 2px solid white;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1> AI Event Analyzer</h1>
+            <p>PT. Chandra Asri Pacific</p>
+        </div>
+
+        <div class="chat-container">
+            <div class="data-info" id="dataInfo">
+            
+            </div>
+
+            <div class="chat-messages" id="chatMessages">
+                <div class="message bot">
+                    <div class="message-content">
+                        <strong>Hello!</strong> I'm an AI Assistant with advanced data analysis capabilities.
+                        <br><br>
+                        <strong>💡 Example Questions:</strong>
+                        <ul style="margin-top: 10px;">
+                            <li>Event in september</li>
+                            <li>GB-651 anomalies in august</li>
+                            <li>BA-109 graph from september 10-17</li>
+                            <li>Compare GB-651 vs BA-109 in September with trend</li>
+                            <li>Highest event with trend</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="input-area">
+                <div class="examples">
+                    <div class="example-chip" onclick="askExample('Event in september')">
+                        📋 List events
+                    </div>
+                    <div class="example-chip" onclick="askExample('event anomalies in august')">
+                        ⚠️ Anomaly
+                    </div>
+                    <div class="example-chip" onclick="askExample('Compare GB-651 vs BA-109 in September with trend')">
+                        🔄 Compare + Trend
+                    </div>
+                    <div class="example-chip" onclick="askExample('GB-651 28 august - 16 september')">
+                        📅 Cross-month
+                    </div>
+                </div>
+                <div class="input-group">
+                    <input 
+                        type="text" 
+                        id="queryInput" 
+                        placeholder="Type your question here..."
+                        onkeypress="if(event.key === 'Enter') askQuestion()"
+                    />
+                    <button onclick="askQuestion()" id="sendBtn">
+                        Kirim
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:8000';
+        const chatMessages = document.getElementById('chatMessages');
+        const queryInput = document.getElementById('queryInput');
+        const sendBtn = document.getElementById('sendBtn');
+        let chartCounter = 0;
+
+        // Color palette for multiple datasets
+        const CHART_COLORS = [
+            { border: '#667eea', bg: 'rgba(102, 126, 234, 0.1)' },
+            { border: '#f59e0b', bg: 'rgba(245, 158, 11, 0.1)' },
+            { border: '#10b981', bg: 'rgba(16, 185, 129, 0.1)' },
+            { border: '#ef4444', bg: 'rgba(239, 68, 68, 0.1)' },
+            { border: '#8b5cf6', bg: 'rgba(139, 92, 246, 0.1)' },
+            { border: '#06b6d4', bg: 'rgba(6, 182, 212, 0.1)' }
+        ];
+
+        marked.setOptions({
+            breaks: true,
+            gfm: true
+        });
+
+        function getMethodBadge(method) {
+            const badges = {
+                'llm_analysis': '<span class="method-badge method-llm">🧠 LLM</span>',
+                'identifier_search': '<span class="method-badge method-identifier">🔍 ID</span>',
+                'general_llm': '<span class="method-badge method-general">💬 General</span>',
+                'comparison': '<span class="method-badge method-llm">📊 Compare</span>',
+                'comparison_with_trend': '<span class="method-badge method-llm">📊 Compare+Trend</span>',
+                'comparison_with_analysis': '<span class="method-badge method-llm">📊 Compare+Analysis</span>',
+                'anomaly_detection': '<span class="method-badge" style="background: #ef4444; color: white;">⚠️ Anomaly</span>',
+                'pi_tag_lookup': '<span class="method-badge" style="background: #8b5cf6; color: white;">🏷️ PI Tag</span>',
+                'temporal_analysis': '<span class="method-badge" style="background: #06b6d4; color: white;">📊 Temporal</span>',
+                'cached': '<span class="cache-indicator">⚡ Cache</span>'
+            };
+            return badges[method] || '';
+        }
+
+        function getConfidenceBadge(confidence) {
+            if (!confidence) return '';
+            
+            let className = 'confidence-low';
+            let emoji = '⚠️';
+            
+            if (confidence >= 80) {
+                className = 'confidence-high';
+                emoji = '✅';
+            } else if (confidence >= 60) {
+                className = 'confidence-medium';
+                emoji = '⚡';
+            }
+            
+            return `<span class="confidence-badge ${className}">${emoji} ${confidence}%</span>`;
+        }
+
+        // ENHANCED: Support both single and multiple datasets
+        function renderXYGraph(graphData, containerId) {
+            console.log('📈 Rendering graph:', graphData);
+            
+            const container = document.getElementById(containerId);
+            if (!container) {
+                console.error('Container not found:', containerId);
+                return;
+            }
+            
+            const wrapper = document.createElement('div');
+            wrapper.className = 'chart-canvas-wrapper';
+            
+            const canvas = document.createElement('canvas');
+            canvas.id = `${containerId}-canvas`;
+            wrapper.appendChild(canvas);
+            container.appendChild(wrapper);
+            
+            // Check if multiple datasets (comparison mode)
+            const isComparison = graphData.datasets && graphData.datasets.length > 1;
+            
+            // Stats panel
+            const statsDiv = document.createElement('div');
+            statsDiv.className = 'chart-stats';
+            
+            let statsHtml = '';
+            
+            if (isComparison) {
+                // Show stats for each dataset
+                graphData.datasets.forEach((dataset, idx) => {
+                    const color = CHART_COLORS[idx % CHART_COLORS.length];
+                    statsHtml += `
+                        <div class="stat-item" style="border-left: 4px solid ${color.border};">
+                            <div class="stat-label">${dataset.label}</div>
+                            <div class="stat-value">${dataset.total.toLocaleString()}</div>
+                        </div>
+                    `;
+                });
+            } else {
+                // Single dataset stats
+                statsHtml = `
+                    <div class="stat-item">
+                        <div class="stat-label">Total</div>
+                        <div class="stat-value">${graphData.stats.total.toLocaleString()}</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Average</div>
+                        <div class="stat-value">${graphData.stats.avg}</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Max</div>
+                        <div class="stat-value">${graphData.stats.max}</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Min</div>
+                        <div class="stat-value">${graphData.stats.min}</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Trend</div>
+                        <div class="stat-value">${graphData.stats.trend}</div>
+                    </div>
+                `;
+                
+                // Add anomaly stats if present
+                if (graphData.anomaly_info && graphData.anomaly_info.count > 0) {
+                    statsHtml += `
+                        <div class="stat-item" style="background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%); border: 2px solid #ef4444;">
+                            <div class="stat-label" style="color: #991b1b;">⚠️ Anomaly</div>
+                            <div class="stat-value" style="color: #dc2626;">${graphData.anomaly_info.count}</div>
+                        </div>
+                    `;
+                }
+            }
+            
+            statsDiv.innerHTML = statsHtml;
+            container.appendChild(statsDiv);
+            
+            setTimeout(() => {
+                const ctx = canvas.getContext('2d');
+                
+                let chartConfig;
+                
+                if (isComparison) {
+                    // COMPARISON MODE: Multiple lines
+                    const datasets = graphData.datasets.map((dataset, idx) => {
+                        const color = CHART_COLORS[idx % CHART_COLORS.length];
+                        return {
+                            label: dataset.label,
+                            data: dataset.counts,
+                            borderColor: color.border,
+                            backgroundColor: color.bg,
+                            borderWidth: 3,
+                            fill: true,
+                            tension: 0.4,
+                            pointRadius: 5,
+                            pointHoverRadius: 8,
+                            pointBackgroundColor: color.border,
+                            pointBorderColor: '#fff',
+                            pointBorderWidth: 2
+                        };
+                    });
+                    
+                    chartConfig = {
+                        type: 'line',
+                        data: {
+                            labels: graphData.datasets[0].dates, // Use dates from first dataset
+                            datasets: datasets
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: true,
+                            interaction: {
+                                mode: 'index',
+                                intersect: false
+                            },
+                            plugins: {
+                                legend: {
+                                    display: true,
+                                    position: 'top',
+                                    labels: {
+                                        font: { size: 13, weight: '600' },
+                                        padding: 15,
+                                        usePointStyle: true,
+                                        pointStyle: 'circle'
+                                    }
+                                },
+                                title: {
+                                    display: true,
+                                    text: graphData.title,
+                                    font: { size: 16, weight: 'bold' },
+                                    padding: { bottom: 20 }
+                                },
+                                tooltip: {
+                                    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                                    padding: 12,
+                                    titleFont: { size: 14 },
+                                    bodyFont: { size: 13 },
+                                    callbacks: {
+                                        title: function(context) {
+                                            return `📅 ${context[0].label}`;
+                                        },
+                                        label: function(context) {
+                                            return ` ${context.dataset.label}: ${context.parsed.y} events`;
+                                        }
+                                    }
+                                }
+                            },
+                            scales: {
+                                y: {
+                                    beginAtZero: true,
+                                    ticks: { 
+                                        font: { size: 11 },
+                                        callback: function(value) {
+                                            return value.toLocaleString();
+                                        }
+                                    },
+                                    grid: { color: 'rgba(0,0,0,0.05)' },
+                                    title: {
+                                        display: true,
+                                        text: 'Events',
+                                        font: { size: 12, weight: '600' }
+                                    }
+                                },
+                                x: {
+                                    ticks: { 
+                                        font: { size: 10 },
+                                        maxRotation: 45,
+                                        minRotation: 45
+                                    },
+                                    grid: { display: false },
+                                    title: {
+                                        display: true,
+                                        text: 'Date',
+                                        font: { size: 12, weight: '600' }
+                                    }
+                                }
+                            }
+                        }
+                    };
+                } else {
+                    // SINGLE MODE: One line with anomalies
+                    let pointColors = Array(graphData.data.dates.length).fill('#667eea');
+                    let pointSizes = Array(graphData.data.dates.length).fill(5);
+                    
+                    if (graphData.anomaly_dates && graphData.anomaly_dates.length > 0) {
+                        console.log('⚠️ Highlighting anomalies:', graphData.anomaly_dates);
+                        graphData.data.dates.forEach((date, index) => {
+                            if (graphData.anomaly_dates.includes(date)) {
+                                pointColors[index] = '#ef4444';
+                                pointSizes[index] = 10;
+                            }
+                        });
+                    }
+                    
+                    chartConfig = {
+                        type: 'line',
+                        data: {
+                            labels: graphData.data.dates,
+                            datasets: [{
+                                label: 'Jumlah Events',
+                                data: graphData.data.counts,
+                                borderColor: '#667eea',
+                                backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                                borderWidth: 3,
+                                fill: true,
+                                tension: 0.4,
+                                pointRadius: pointSizes,
+                                pointHoverRadius: 7,
+                                pointBackgroundColor: pointColors,
+                                pointBorderColor: '#fff',
+                                pointBorderWidth: 2
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: true,
+                            plugins: {
+                                legend: {
+                                    display: true,
+                                    position: 'top',
+                                    labels: {
+                                        font: { size: 12, weight: '600' }
+                                    }
+                                },
+                                title: {
+                                    display: true,
+                                    text: graphData.title,
+                                    font: { size: 16, weight: 'bold' }
+                                },
+                                tooltip: {
+                                    callbacks: {
+                                        title: function(context) {
+                                            const date = context[0].label;
+                                            const isAnomaly = graphData.anomaly_dates && graphData.anomaly_dates.includes(date);
+                                            return `📅 ${date}${isAnomaly ? ' ⚠️ Anomaly' : ''}`;
+                                        }
+                                    }
+                                }
+                            },
+                            scales: {
+                                y: {
+                                    beginAtZero: true,
+                                    ticks: { font: { size: 11 } },
+                                    grid: { color: 'rgba(0,0,0,0.05)' }
+                                },
+                                x: {
+                                    ticks: { 
+                                        font: { size: 10 },
+                                        maxRotation: 45,
+                                        minRotation: 45
+                                    },
+                                    grid: { display: false }
+                                }
+                            }
+                        }
+                    };
+                }
+                
+                new Chart(ctx, chartConfig);
+                console.log('✅ Graph rendered successfully');
+            }, 100);
+        }
+
+        function addMessage(text, isUser = false, metadata = {}) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${isUser ? 'user' : 'bot'}`;
+            
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'message-content';
+            
+            if (isUser) {
+                contentDiv.textContent = text;
+            } else {
+                const badges = [];
+                if (metadata.method) badges.push(getMethodBadge(metadata.method));
+                if (metadata.confidence) badges.push(getConfidenceBadge(metadata.confidence));
+                
+                const badgeHtml = badges.length > 0 ? `<div style="margin-bottom: 10px;">${badges.join(' ')}</div>` : '';
+                
+                contentDiv.innerHTML = badgeHtml + marked.parse(text);
+                
+                if (metadata.graph_data) {
+                    chartCounter++;
+                    const chartId = `chart-${chartCounter}`;
+                    
+                    const chartContainer = document.createElement('div');
+                    chartContainer.className = 'chart-container';
+                    chartContainer.id = chartId;
+                    
+                    const title = document.createElement('div');
+                    title.className = 'chart-title';
+                    title.innerHTML = `📊 ${metadata.graph_data.title || 'Event Timeline'}`;
+                    chartContainer.appendChild(title);
+                    
+                    contentDiv.appendChild(chartContainer);
+                    
+                    setTimeout(() => renderXYGraph(metadata.graph_data, chartId), 100);
+                }
+            }
+            
+            messageDiv.appendChild(contentDiv);
+            chatMessages.appendChild(messageDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        async function askQuestion() {
+            const query = queryInput.value.trim();
+            if (!query) return;
+            
+            addMessage(query, true);
+            queryInput.value = '';
+            queryInput.disabled = true;
+            sendBtn.disabled = true;
+            sendBtn.innerHTML = '<span class="loading"></span>';
+            
+            try {
+                const response = await fetch(`${API_URL}/ask`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query })
+                });
+                
+                const data = await response.json();
+                console.log('📥 Response:', data);
+                
+                if (data.success) {
+                    addMessage(data.answer, false, {
+                        method: data.method,
+                        confidence: data.confidence,
+                        graph_data: data.graph_data
+                    });
+                } else {
+                    addMessage(`❌ Error: ${data.error}`, false);
+                }
+            } catch (error) {
+                console.error('Request error:', error);
+                addMessage(`❌ Koneksi error: ${error.message}`, false);
+            } finally {
+                queryInput.disabled = false;
+                sendBtn.disabled = false;
+                sendBtn.textContent = 'Kirim';
+                queryInput.focus();
+            }
+        }
+
+        function askExample(query) {
+            queryInput.value = query;
+            askQuestion();
+        }
+
+        // Load data info on start
+        async function loadDataInfo() {
+            try {
+                const response = await fetch(`${API_URL}/profile`);
+                const profile = await response.json();
+                
+                const infoDiv = document.getElementById('dataInfo');
+                infoDiv.innerHTML = `
+                    📊 <strong>${profile.total_events.toLocaleString()} events</strong> | 
+                    📅 ${profile.date_range.start} to ${profile.date_range.end} | 
+                    📈 Avg: ${profile.daily_stats.avg_events_per_day} events/day
+                `;
+            } catch (error) {
+                console.error('Failed to load data info:', error);
+            }
+        }
+
+        loadDataInfo();
+        queryInput.focus();
+    </script>
+</body>
+</html>
