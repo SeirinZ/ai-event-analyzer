@@ -390,50 +390,17 @@
             font-size: 0.7rem;
             margin-left: 5px;
         }
-
-        /* NEW: Multi-chart grid */
-        .multi-chart-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
-            gap: 20px;
-            margin: 20px 0;
-        }
-
-        /* Legend for comparison */
-        .chart-legend {
-            display: flex;
-            gap: 15px;
-            margin-bottom: 10px;
-            flex-wrap: wrap;
-        }
-
-        .legend-item {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            font-size: 0.85rem;
-            font-weight: 500;
-        }
-
-        .legend-color {
-            width: 20px;
-            height: 20px;
-            border-radius: 4px;
-            border: 2px solid white;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
-        }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1> AI Event Analyzer</h1>
+            <h1>AI Event Analyzer</h1>
             <p>PT. Chandra Asri Pacific</p>
         </div>
 
         <div class="chat-container">
             <div class="data-info" id="dataInfo">
-            
             </div>
 
             <div class="chat-messages" id="chatMessages">
@@ -476,7 +443,7 @@
                         onkeypress="if(event.key === 'Enter') askQuestion()"
                     />
                     <button onclick="askQuestion()" id="sendBtn">
-                        Kirim
+                        Send
                     </button>
                 </div>
             </div>
@@ -512,11 +479,8 @@
                 'general_llm': '<span class="method-badge method-general">💬 General</span>',
                 'comparison': '<span class="method-badge method-llm">📊 Compare</span>',
                 'comparison_with_trend': '<span class="method-badge method-llm">📊 Compare+Trend</span>',
-                'comparison_with_analysis': '<span class="method-badge method-llm">📊 Compare+Analysis</span>',
                 'anomaly_detection': '<span class="method-badge" style="background: #ef4444; color: white;">⚠️ Anomaly</span>',
-                'pi_tag_lookup': '<span class="method-badge" style="background: #8b5cf6; color: white;">🏷️ PI Tag</span>',
                 'temporal_analysis': '<span class="method-badge" style="background: #06b6d4; color: white;">📊 Temporal</span>',
-                'cached': '<span class="cache-indicator">⚡ Cache</span>'
             };
             return badges[method] || '';
         }
@@ -538,13 +502,14 @@
             return `<span class="confidence-badge ${className}">${emoji} ${confidence}%</span>`;
         }
 
-        // ENHANCED: Support both single and multiple datasets
+        // COMPLETELY REWRITTEN - FIXED COMPARISON GRAPH
         function renderXYGraph(graphData, containerId) {
-            console.log('📈 Rendering graph:', graphData);
+            console.log('📈 [RENDER] Starting graph render...');
+            console.log('📊 [RENDER] Full graph data:', JSON.stringify(graphData, null, 2));
             
             const container = document.getElementById(containerId);
             if (!container) {
-                console.error('Container not found:', containerId);
+                console.error('❌ [RENDER] Container not found:', containerId);
                 return;
             }
             
@@ -553,11 +518,15 @@
             
             const canvas = document.createElement('canvas');
             canvas.id = `${containerId}-canvas`;
+            canvas.width = 800;
+            canvas.height = 400;
             wrapper.appendChild(canvas);
             container.appendChild(wrapper);
             
             // Check if multiple datasets (comparison mode)
-            const isComparison = graphData.datasets && graphData.datasets.length > 1;
+            const isComparison = graphData.datasets && graphData.datasets.length > 0;
+            
+            console.log(`🔍 [RENDER] Is comparison: ${isComparison}`);
             
             // Stats panel
             const statsDiv = document.createElement('div');
@@ -566,8 +535,16 @@
             let statsHtml = '';
             
             if (isComparison) {
-                // Show stats for each dataset
+                console.log(`📊 [RENDER] Comparison mode - ${graphData.datasets.length} datasets`);
                 graphData.datasets.forEach((dataset, idx) => {
+                    console.log(`  Dataset ${idx} (${dataset.label}):`, {
+                        total: dataset.total,
+                        counts_sample: dataset.counts.slice(0, 5),
+                        counts_length: dataset.counts.length,
+                        max: Math.max(...dataset.counts),
+                        non_zero: dataset.counts.filter(c => c > 0).length
+                    });
+                    
                     const color = CHART_COLORS[idx % CHART_COLORS.length];
                     statsHtml += `
                         <div class="stat-item" style="border-left: 4px solid ${color.border};">
@@ -601,7 +578,6 @@
                     </div>
                 `;
                 
-                // Add anomaly stats if present
                 if (graphData.anomaly_info && graphData.anomaly_info.count > 0) {
                     statsHtml += `
                         <div class="stat-item" style="background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%); border: 2px solid #ef4444;">
@@ -616,17 +592,34 @@
             container.appendChild(statsDiv);
             
             setTimeout(() => {
+                console.log('🎨 [RENDER] Creating Chart.js instance...');
                 const ctx = canvas.getContext('2d');
                 
                 let chartConfig;
                 
                 if (isComparison) {
                     // COMPARISON MODE: Multiple lines
+                    console.log('📊 [RENDER] Building comparison chart config...');
+                    
                     const datasets = graphData.datasets.map((dataset, idx) => {
                         const color = CHART_COLORS[idx % CHART_COLORS.length];
+                        
+                        // CRITICAL: Ensure all values are numbers
+                        const counts = dataset.counts.map(c => {
+                            const num = Number(c);
+                            return isNaN(num) ? 0 : num;
+                        });
+                        
+                        console.log(`  ✓ Dataset ${dataset.label}:`, {
+                            original_counts: dataset.counts.slice(0, 5),
+                            converted_counts: counts.slice(0, 5),
+                            max: Math.max(...counts),
+                            min: Math.min(...counts)
+                        });
+                        
                         return {
                             label: dataset.label,
-                            data: dataset.counts,
+                            data: counts,
                             borderColor: color.border,
                             backgroundColor: color.bg,
                             borderWidth: 3,
@@ -640,15 +633,27 @@
                         };
                     });
                     
+                    // Calculate global Y-axis range
+                    const allValues = datasets.flatMap(ds => ds.data);
+                    const maxY = Math.max(...allValues);
+                    const minY = Math.min(...allValues);
+                    
+                    console.log(`📊 [RENDER] Y-axis range: ${minY} to ${maxY}`);
+                    
+                    // Use first dataset's dates as labels
+                    const labels = graphData.datasets[0].dates;
+                    
+                    console.log(`📅 [RENDER] X-axis labels (${labels.length}):`, labels.slice(0, 5));
+                    
                     chartConfig = {
                         type: 'line',
                         data: {
-                            labels: graphData.datasets[0].dates, // Use dates from first dataset
+                            labels: labels,
                             datasets: datasets
                         },
                         options: {
                             responsive: true,
-                            maintainAspectRatio: true,
+                            maintainAspectRatio: false,
                             interaction: {
                                 mode: 'index',
                                 intersect: false
@@ -688,17 +693,26 @@
                             scales: {
                                 y: {
                                     beginAtZero: true,
+                                    max: maxY > 0 ? Math.ceil(maxY * 1.1) : 10,
                                     ticks: { 
                                         font: { size: 11 },
+                                        stepSize: Math.max(1, Math.ceil(maxY / 10)),
                                         callback: function(value) {
-                                            return value.toLocaleString();
+                                            if (Number.isInteger(value)) {
+                                                return value.toLocaleString();
+                                            }
                                         }
                                     },
-                                    grid: { color: 'rgba(0,0,0,0.05)' },
+                                    grid: { 
+                                        color: 'rgba(0,0,0,0.08)',
+                                        drawBorder: true,
+                                        borderColor: '#ccc',
+                                        borderWidth: 2
+                                    },
                                     title: {
                                         display: true,
-                                        text: 'Events',
-                                        font: { size: 12, weight: '600' }
+                                        text: 'Events Count',
+                                        font: { size: 13, weight: '600' }
                                     }
                                 },
                                 x: {
@@ -718,12 +732,14 @@
                         }
                     };
                 } else {
-                    // SINGLE MODE: One line with anomalies
+                    // SINGLE MODE
+                    console.log('📊 [RENDER] Building single line chart config...');
+                    
                     let pointColors = Array(graphData.data.dates.length).fill('#667eea');
                     let pointSizes = Array(graphData.data.dates.length).fill(5);
                     
                     if (graphData.anomaly_dates && graphData.anomaly_dates.length > 0) {
-                        console.log('⚠️ Highlighting anomalies:', graphData.anomaly_dates);
+                        console.log('⚠️ [RENDER] Highlighting anomalies:', graphData.anomaly_dates);
                         graphData.data.dates.forEach((date, index) => {
                             if (graphData.anomaly_dates.includes(date)) {
                                 pointColors[index] = '#ef4444';
@@ -737,7 +753,7 @@
                         data: {
                             labels: graphData.data.dates,
                             datasets: [{
-                                label: 'Jumlah Events',
+                                label: 'Events',
                                 data: graphData.data.counts,
                                 borderColor: '#667eea',
                                 backgroundColor: 'rgba(102, 126, 234, 0.1)',
@@ -753,14 +769,12 @@
                         },
                         options: {
                             responsive: true,
-                            maintainAspectRatio: true,
+                            maintainAspectRatio: false,
                             plugins: {
                                 legend: {
                                     display: true,
                                     position: 'top',
-                                    labels: {
-                                        font: { size: 12, weight: '600' }
-                                    }
+                                    labels: { font: { size: 12, weight: '600' } }
                                 },
                                 title: {
                                     display: true,
@@ -796,9 +810,16 @@
                     };
                 }
                 
-                new Chart(ctx, chartConfig);
-                console.log('✅ Graph rendered successfully');
-            }, 100);
+                console.log('🎨 [RENDER] Final chart config:', JSON.stringify(chartConfig, null, 2));
+                
+                try {
+                    const chart = new Chart(ctx, chartConfig);
+                    console.log('✅ [RENDER] Chart created successfully!');
+                    console.log('📊 [RENDER] Chart data verification:', chart.data);
+                } catch (error) {
+                    console.error('❌ [RENDER] Error creating chart:', error);
+                }
+            }, 200);
         }
 
         function addMessage(text, isUser = false, metadata = {}) {
@@ -814,12 +835,15 @@
                 const badges = [];
                 if (metadata.method) badges.push(getMethodBadge(metadata.method));
                 if (metadata.confidence) badges.push(getConfidenceBadge(metadata.confidence));
+                if (metadata.cached) badges.push('<span class="cache-indicator">⚡ Cached</span>');
                 
                 const badgeHtml = badges.length > 0 ? `<div style="margin-bottom: 10px;">${badges.join(' ')}</div>` : '';
                 
                 contentDiv.innerHTML = badgeHtml + marked.parse(text);
                 
                 if (metadata.graph_data) {
+                    console.log('🎨 [MESSAGE] Received graph_data:', metadata.graph_data);
+                    
                     chartCounter++;
                     const chartId = `chart-${chartCounter}`;
                     
@@ -834,7 +858,7 @@
                     
                     contentDiv.appendChild(chartContainer);
                     
-                    setTimeout(() => renderXYGraph(metadata.graph_data, chartId), 100);
+                    setTimeout(() => renderXYGraph(metadata.graph_data, chartId), 150);
                 }
             }
             
@@ -861,24 +885,25 @@
                 });
                 
                 const data = await response.json();
-                console.log('📥 Response:', data);
+                console.log('📥 [API] Response:', data);
                 
                 if (data.success) {
                     addMessage(data.answer, false, {
                         method: data.method,
                         confidence: data.confidence,
-                        graph_data: data.graph_data
+                        graph_data: data.graph_data,
+                        cached: data.cached
                     });
                 } else {
                     addMessage(`❌ Error: ${data.error}`, false);
                 }
             } catch (error) {
-                console.error('Request error:', error);
-                addMessage(`❌ Koneksi error: ${error.message}`, false);
+                console.error('❌ [API] Request error:', error);
+                addMessage(`❌ Connection error: ${error.message}`, false);
             } finally {
                 queryInput.disabled = false;
                 sendBtn.disabled = false;
-                sendBtn.textContent = 'Kirim';
+                sendBtn.textContent = 'Send';
                 queryInput.focus();
             }
         }
@@ -888,7 +913,6 @@
             askQuestion();
         }
 
-        // Load data info on start
         async function loadDataInfo() {
             try {
                 const response = await fetch(`${API_URL}/profile`);

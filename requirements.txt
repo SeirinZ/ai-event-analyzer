@@ -1,4 +1,5 @@
-flask
-python-dotenv
-pandas
-requests
+flask==3.0.0
+pandas==2.1.3
+numpy==1.26.2
+requests==2.31.0
+python-dotenv==1.0.0
